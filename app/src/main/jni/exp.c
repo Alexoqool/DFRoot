@@ -21,6 +21,8 @@
 #include "aes256.h"
 #include "hmac_sha256.h"
 
+#define eos(s) (s + strlen(s))
+
 static jmethodID report_mid;
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved __attribute__((unused))) {
@@ -361,10 +363,23 @@ static const struct KoImage *select_ko_image(int andr, int major, int minor) {
 }
 
 static int read_device_versions(int *andr, int *major, int *minor) {
-    struct utsname u;
-    if (uname(&u) != 0) return -1;
-    if (sscanf(u.release, "%d.%d", major, minor) != 2) return -1;
-    const char *m = strstr(u.release, "android");
+    char release[20];
+    char android[5];
+    char kernel[5];
+
+    FILE *f = popen("getprop ro.vendor.build.version.release", "r");
+    fgets(android, sizeof(android), f);
+    pclose(f);
+    f = popen("getprop ro.kernel.version", "r");
+    fgets(kernel, sizeof(kernel), f);
+    pclose(f);
+
+    sprintf(release, "%s", kernel);
+    sprintf(eos(release), "-android");
+    sprintf(eos(release), "%s", android);
+
+    if (sscanf(release, "%d.%d", major, minor) != 2) return -1;
+    const char *m = strstr(release, "android");
     if (!m) return -1;
     *andr = atoi(m + 7);
     return (*andr > 0) ? 0 : -1;
